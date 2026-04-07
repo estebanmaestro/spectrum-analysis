@@ -2,20 +2,20 @@
 Interactive ON/OFF Spectrum Dashboard
 =====================================
 Dash/Plotly app for exploring per-site ON/OFF clustering results.
-Supports multi-site selection with per-site color differentiation.
-
-Clustering mode (per site): default bundle result, PowerGap on total power,
-or PowerGap on summed µV² in f < 1 MHz plus f ≥ 30 MHz.
+Supports multi-site selection, color-by mode (running state / site / org),
+manual label overrides, and CSV export of running-state flags.
 
 Usage:
     python src/_dashboard.py
     Then open http://127.0.0.1:8050 in a browser.
 """
 import os, pickle
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, html, dcc, callback, Output, Input
+from dash import (Dash, html, dcc, dash_table, callback,
+                  Output, Input, State, no_update)
 from sklearn.metrics import silhouette_score
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,15 +36,14 @@ CLUSTER_BAND_LIMITED = 'band_limited'
 CLUSTER_OPTIONS = [
     {'label': 'Default (saved pipeline)', 'value': CLUSTER_DEFAULT},
     {'label': 'Total power — largest gap in log-power', 'value': CLUSTER_TOTAL_POWER},
-    {
-        'label': 'Band power — <1 MHz + ≥30 MHz (largest gap)',
-        'value': CLUSTER_BAND_LIMITED,
-    },
+    {'label': 'Band power — <1 MHz + ≥30 MHz (largest gap)', 'value': CLUSTER_BAND_LIMITED},
 ]
 
+# ═══════════════════════════════════════════════════════════════
+# CLUSTERING HELPERS
+# ═══════════════════════════════════════════════════════════════
 
 def _powergap_binary_labels(log_vals):
-    """Largest-gap split on sorted log-scale values; returns 0/1 labels or None."""
     log_vals = np.asarray(log_vals, dtype=float)
     n = len(log_vals)
     if n < 2:
@@ -62,7 +61,6 @@ def _powergap_binary_labels(log_vals):
 
 
 def _assignment_from_labels(site_df, labels, linear_power):
-    """Higher mean linear power cluster → ON."""
     linear_power = np.asarray(linear_power, dtype=float)
     labels = np.asarray(labels).ravel()
     cluster_ids = sorted(np.unique(labels))
@@ -77,7 +75,6 @@ def _assignment_from_labels(site_df, labels, linear_power):
 
 
 def _band_limited_power_uv2(freqs_hz, amps_uv):
-    """Sum of squared amplitude (µV²) for f < 1 MHz and f ≥ 30 MHz."""
     freqs_hz = np.asarray(freqs_hz, dtype=float)
     amps_uv = np.asarray(amps_uv, dtype=float)
     pwr = amps_uv ** 2
@@ -98,7 +95,6 @@ def _band_powers_for_site(site, site_df):
 
 
 def _confidence_from_log_metric(site_df, assignment, log_metric):
-    """Separability 0–100 and per-sample scores (same logic as validation script)."""
     log_tp = np.asarray(log_metric, dtype=float)
     n_site = len(site_df)
     sids = site_df['spectrum_id'].values
@@ -155,10 +151,6 @@ def _silhouette_1d(log_metric, labels):
 
 
 def _dashboard_cluster_view(site, mode):
-    """
-    Returns dict: assignment, config, silhouette, confidence, sample_confidence.
-    For default mode, pulls from bundle (silhouette/confidence from saved run).
-    """
     if site not in site_assignments:
         return None
     sa = site_assignments[site]
@@ -216,13 +208,17 @@ def _dashboard_cluster_view(site, mode):
 
 
 def _views_for_sites(sites, mode):
-    """Per-site cluster views; missing sites omitted."""
     out = {}
     for site in sites:
         v = _dashboard_cluster_view(site, mode)
         if v is not None:
             out[site] = v
     return out
+
+
+# ═══════════════════════════════════════════════════════════════
+# PALETTES & COLOR HELPERS
+# ═══════════════════════════════════════════════════════════════
 
 SITE_PALETTE = [
     '#1D4ED8', '#047857', '#7C3AED', '#DC2626', '#B45309',
@@ -233,10 +229,37 @@ SITE_PALETTE = [
     '#047857', '#7C3AED', '#DC2626', '#B45309', '#0891B2',
 ]
 
-app = Dash(__name__)
-app.title = "ON/OFF Spectrum Analysis"
+COLOR_BY_STATE = 'running_state'
+COLOR_BY_SITE = 'site'
+COLOR_BY_ORG = 'org'
 
-first_site = all_site_names[0]
+COLOR_BY_OPTIONS = [
+    {'label': 'Running State (ON/OFF)', 'value': COLOR_BY_STATE},
+    {'label': 'Site', 'value': COLOR_BY_SITE},
+    {'label': 'Organization (first 3 letters)', 'value': COLOR_BY_ORG},
+]
+
+
+def _get_org(site_name):
+    return site_name[:3]
+
+
+_all_orgs = sorted(set(_get_org(s) for s in all_site_names))
+
+ORG_PALETTE = [
+    '#1D4ED8', '#047857', '#7C3AED', '#DC2626', '#B45309',
+    '#0891B2', '#BE185D', '#D97706', '#059669', '#6D28D9',
+    '#0369A1', '#A21CAF', '#C2410C', '#15803D', '#1E40AF',
+]
+
+
+def _org_color(site_name):
+    org = _get_org(site_name)
+    try:
+        idx = _all_orgs.index(org)
+    except ValueError:
+        idx = 0
+    return ORG_PALETTE[idx % len(ORG_PALETTE)]
 
 
 def _site_color(site, selected_sites):
@@ -245,6 +268,30 @@ def _site_color(site, selected_sites):
     except ValueError:
         idx = 0
     return SITE_PALETTE[idx % len(SITE_PALETTE)]
+
+
+def _resolve_color(site, inferred, sites, color_by, is_override=False):
+    """Pick trace color based on the active color-by mode.
+    When color_by is running_state and the label was manually overridden,
+    use a muted tone so overrides are visually distinct from cluster labels.
+    """
+    if color_by == COLOR_BY_STATE:
+        if is_override:
+            return '#F87171' if inferred == 'ON' else '#93C5FD'
+        return '#DC2626' if inferred == 'ON' else '#2563EB'
+    if color_by == COLOR_BY_ORG:
+        return _org_color(site)
+    return _site_color(site, sites)
+
+
+# ═══════════════════════════════════════════════════════════════
+# APP SETUP
+# ═══════════════════════════════════════════════════════════════
+
+app = Dash(__name__)
+app.title = "ON/OFF Spectrum Analysis"
+
+first_site = all_site_names[0]
 
 
 def _normalize_sites(sites):
@@ -257,11 +304,58 @@ def _normalize_sites(sites):
     return list(sites)
 
 
+_LABEL_STYLE = {
+    'fontWeight': '600', 'fontSize': '0.85rem', 'marginBottom': '6px',
+    'display': 'block', 'color': '#1a2332',
+}
+
+_TABLE_COLUMNS = [
+    {'name': 'Site', 'id': 'site', 'editable': False},
+    {'name': 'Spectrum ID', 'id': 'spectrum_id', 'editable': False},
+    {'name': 'Cluster State', 'id': 'cluster_state', 'editable': False},
+    {'name': 'Manual Override', 'id': 'manual_override',
+     'presentation': 'dropdown'},
+    {'name': 'Score', 'id': 'score', 'type': 'numeric', 'editable': False},
+    {'name': 'Total Power (µV²)', 'id': 'total_power', 'editable': False},
+    {'name': 'Method', 'id': 'method', 'editable': False},
+]
+
+_TABLE_DROPDOWN = {
+    'manual_override': {
+        'options': [
+            {'label': '', 'value': ''},
+            {'label': 'ON', 'value': 'ON'},
+            {'label': 'OFF', 'value': 'OFF'},
+        ],
+    },
+}
+
+_TABLE_STYLE_COND = [
+    {'if': {'column_id': 'cluster_state', 'filter_query': '{cluster_state} = "ON"'},
+     'backgroundColor': '#dcfce7', 'color': '#166534', 'fontWeight': '700'},
+    {'if': {'column_id': 'cluster_state', 'filter_query': '{cluster_state} = "OFF"'},
+     'backgroundColor': '#fee2e2', 'color': '#991b1b', 'fontWeight': '700'},
+    {'if': {'column_id': 'manual_override', 'filter_query': '{manual_override} = "ON"'},
+     'backgroundColor': '#dcfce7', 'color': '#166534', 'fontWeight': '700'},
+    {'if': {'column_id': 'manual_override', 'filter_query': '{manual_override} = "OFF"'},
+     'backgroundColor': '#fee2e2', 'color': '#991b1b', 'fontWeight': '700'},
+    {'if': {'column_id': 'score', 'filter_query': '{score} >= 70'},
+     'backgroundColor': '#d1fae5', 'color': '#065f46'},
+    {'if': {'column_id': 'score', 'filter_query': '{score} < 40'},
+     'backgroundColor': '#fecaca', 'color': '#991b1b'},
+]
+
+
+# ═══════════════════════════════════════════════════════════════
+# LAYOUT
+# ═══════════════════════════════════════════════════════════════
+
 def build_layout():
     return html.Div(style={
         'fontFamily': "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         'background': '#f5f7fa', 'minHeight': '100vh', 'padding': '0',
     }, children=[
+        # Header
         html.Div(style={
             'background': '#003d4d', 'color': 'white', 'padding': '28px 40px',
             'borderBottom': '4px solid #00838f',
@@ -273,20 +367,20 @@ def build_layout():
                       style={'opacity': '0.7', 'fontSize': '0.9rem'}),
         ]),
 
+        # Main content
         html.Div(style={
             'maxWidth': '1400px', 'margin': '0 auto', 'padding': '24px 32px',
         }, children=[
+            # ── Control bar ──
             html.Div(style={
                 'display': 'flex', 'gap': '20px', 'marginBottom': '20px',
                 'flexWrap': 'wrap', 'alignItems': 'flex-start',
                 'justifyContent': 'space-between',
             }, children=[
-                html.Div(style={'flex': '1 1 320px', 'minWidth': '260px', 'maxWidth': '520px'},
-                         children=[
-                    html.Label("Sites (multi-select)", style={
-                        'fontWeight': '600', 'fontSize': '0.85rem', 'marginBottom': '6px',
-                        'display': 'block', 'color': '#1a2332',
-                    }),
+                html.Div(style={
+                    'flex': '1 1 320px', 'minWidth': '260px', 'maxWidth': '520px',
+                }, children=[
+                    html.Label("Sites (multi-select)", style=_LABEL_STYLE),
                     dcc.Dropdown(
                         id='site-filter',
                         options=[{'label': s, 'value': s} for s in all_site_names],
@@ -301,10 +395,7 @@ def build_layout():
                     'alignItems': 'flex-start', 'flex': '0 1 auto',
                 }, children=[
                     html.Div(style={'minWidth': '160px', 'width': '180px'}, children=[
-                        html.Label("Running State", style={
-                            'fontWeight': '600', 'fontSize': '0.85rem', 'marginBottom': '6px',
-                            'display': 'block', 'color': '#1a2332',
-                        }),
+                        html.Label("Running State", style=_LABEL_STYLE),
                         dcc.Dropdown(
                             id='state-filter',
                             options=[
@@ -312,22 +403,26 @@ def build_layout():
                                 {'label': 'ON', 'value': 'ON'},
                                 {'label': 'OFF', 'value': 'OFF'},
                             ],
-                            value='all',
-                            clearable=False,
+                            value='all', clearable=False,
                             style={'fontSize': '0.85rem'},
                         ),
                     ]),
                     html.Div(style={'minWidth': '220px', 'width': '280px'}, children=[
-                        html.Label("Clustering view", style={
-                            'fontWeight': '600', 'fontSize': '0.85rem', 'marginBottom': '6px',
-                            'display': 'block', 'color': '#1a2332',
-                        }),
+                        html.Label("Clustering view", style=_LABEL_STYLE),
                         dcc.Dropdown(
                             id='clustering-mode',
                             options=CLUSTER_OPTIONS,
-                            value=CLUSTER_DEFAULT,
-                            clearable=False,
+                            value=CLUSTER_DEFAULT, clearable=False,
                             style={'fontSize': '0.82rem'},
+                        ),
+                    ]),
+                    html.Div(style={'minWidth': '200px', 'width': '240px'}, children=[
+                        html.Label("Color by", style=_LABEL_STYLE),
+                        dcc.Dropdown(
+                            id='color-by',
+                            options=COLOR_BY_OPTIONS,
+                            value=COLOR_BY_STATE, clearable=False,
+                            style={'fontSize': '0.85rem'},
                         ),
                     ]),
                     html.Div(id='separability-slot', style={
@@ -336,11 +431,13 @@ def build_layout():
                 ]),
             ]),
 
+            # Info cards
             html.Div(id='info-cards', style={
                 'display': 'flex', 'gap': '16px', 'marginBottom': '24px',
                 'flexWrap': 'wrap',
             }),
 
+            # Chart
             html.Div(style={
                 'background': 'white', 'borderRadius': '8px', 'padding': '20px',
                 'boxShadow': '0 1px 8px rgba(0,0,0,0.06)',
@@ -349,6 +446,7 @@ def build_layout():
                 dcc.Graph(id='spectrum-chart', style={'height': '560px'}),
             ]),
 
+            # Spectrum selector
             html.Div(style={
                 'background': 'white', 'borderRadius': '8px', 'padding': '20px',
                 'boxShadow': '0 1px 8px rgba(0,0,0,0.06)',
@@ -359,30 +457,76 @@ def build_layout():
                     'display': 'block', 'color': '#1a2332',
                 }),
                 dcc.Checklist(
-                    id='spectrum-selector',
-                    inline=True,
+                    id='spectrum-selector', inline=True,
                     style={'fontSize': '0.82rem', 'display': 'flex',
                            'flexWrap': 'wrap', 'gap': '6px 16px'},
                     inputStyle={'marginRight': '4px'},
                 ),
             ]),
 
+            # Assignment table + export
             html.Div(style={
                 'background': 'white', 'borderRadius': '8px', 'padding': '20px',
                 'boxShadow': '0 1px 8px rgba(0,0,0,0.06)',
                 'border': '1px solid #e2e8f0',
             }, children=[
-                html.H3("Spectrum Assignments", style={
-                    'margin': '0 0 12px', 'fontSize': '1rem', 'color': '#1a2332',
-                }),
-                html.Div(id='assignment-table'),
+                html.Div(style={
+                    'display': 'flex', 'justifyContent': 'space-between',
+                    'alignItems': 'center', 'marginBottom': '12px',
+                }, children=[
+                    html.H3("Spectrum Assignments", style={
+                        'margin': '0', 'fontSize': '1rem', 'color': '#1a2332',
+                    }),
+                    html.Button("Export Running States", id='export-btn', n_clicks=0,
+                                style={
+                                    'background': '#005662', 'color': 'white',
+                                    'border': 'none', 'borderRadius': '6px',
+                                    'padding': '8px 20px', 'fontSize': '0.85rem',
+                                    'fontWeight': '600', 'cursor': 'pointer',
+                                }),
+                ]),
+                html.Div(style={'fontSize': '0.78rem', 'color': '#64748b',
+                                'marginBottom': '12px'},
+                         children="Use the Manual Override column to correct labels. "
+                                  "Export merges cluster results with your overrides."),
+                dash_table.DataTable(
+                    id='assignment-datatable',
+                    columns=_TABLE_COLUMNS,
+                    data=[],
+                    editable=True,
+                    dropdown=_TABLE_DROPDOWN,
+                    page_size=50,
+                    sort_action='native',
+                    filter_action='native',
+                    style_table={'overflowX': 'auto'},
+                    style_cell={
+                        'textAlign': 'left', 'padding': '8px 14px',
+                        'fontSize': '0.82rem',
+                        'fontFamily': "'Inter', -apple-system, sans-serif",
+                    },
+                    style_header={
+                        'background': '#e8f5f7', 'color': '#005662',
+                        'fontWeight': '600',
+                        'borderBottom': '2px solid #d4dde3',
+                        'whiteSpace': 'nowrap',
+                    },
+                    style_data_conditional=_TABLE_STYLE_COND,
+                ),
             ]),
+
+            # Hidden stores / download
+            dcc.Store(id='manual-overrides', storage_type='session'),
+            dcc.Download(id='download-labels'),
         ]),
     ])
 
 
 app.layout = build_layout()
 
+
+# ═══════════════════════════════════════════════════════════════
+# HELPER COMPONENTS
+# ═══════════════════════════════════════════════════════════════
 
 def _make_card(title, value, color='#1a2332'):
     return html.Div(style={
@@ -398,16 +542,22 @@ def _make_card(title, value, color='#1a2332'):
     ])
 
 
+# ═══════════════════════════════════════════════════════════════
+# CALLBACKS
+# ═══════════════════════════════════════════════════════════════
+
 @callback(
     Output('spectrum-selector', 'options'),
     Output('spectrum-selector', 'value'),
     Input('site-filter', 'value'),
     Input('state-filter', 'value'),
     Input('clustering-mode', 'value'),
+    Input('color-by', 'value'),
 )
-def update_spectrum_selector(sites, state_val, cluster_mode):
+def update_spectrum_selector(sites, state_val, cluster_mode, color_by):
     sites = _normalize_sites(sites)
     mode = cluster_mode or CLUSTER_DEFAULT
+    color_by = color_by or COLOR_BY_STATE
     views = _views_for_sites(sites, mode)
     options = []
     all_values = []
@@ -417,15 +567,12 @@ def update_spectrum_selector(sites, state_val, cluster_mode):
             continue
         view = views[site]
         assignment = view['assignment']
-        color = _site_color(site, sites)
         multi = len(sites) > 1
         mk = data['site'] == site
         filtered = data.loc[mk]
         if state_val and state_val != 'all':
-            keep = [
-                idx for idx in filtered.index
-                if assignment.get(filtered.loc[idx, 'spectrum_id'], '') == state_val
-            ]
+            keep = [idx for idx in filtered.index
+                    if assignment.get(filtered.loc[idx, 'spectrum_id'], '') == state_val]
             filtered = filtered.loc[keep]
 
         for _, row in filtered.iterrows():
@@ -433,12 +580,11 @@ def update_spectrum_selector(sites, state_val, cluster_mode):
             inferred = assignment.get(sid, '?')
             tag = f"{site}::{sid}"
             prefix = f"[{site}] " if multi else ""
+            color = _resolve_color(site, inferred, sites, color_by)
             options.append({
                 'label': html.Span([
                     html.Span(f"{prefix}[{inferred}] ", style={
-                        'color': color if multi else (
-                            '#DC2626' if inferred == 'ON' else '#2563EB'),
-                        'fontWeight': '700',
+                        'color': color, 'fontWeight': '700',
                     }),
                     sid,
                 ]),
@@ -513,10 +659,14 @@ def update_info_cards(sites, cluster_mode):
     Input('site-filter', 'value'),
     Input('spectrum-selector', 'value'),
     Input('clustering-mode', 'value'),
+    Input('color-by', 'value'),
+    Input('manual-overrides', 'data'),
 )
-def update_spectrum_chart(sites, selected_tags, cluster_mode):
+def update_spectrum_chart(sites, selected_tags, cluster_mode, color_by, overrides):
     sites = _normalize_sites(sites)
     mode = cluster_mode or CLUSTER_DEFAULT
+    color_by = color_by or COLOR_BY_STATE
+    overrides = overrides or {}
     views = _views_for_sites(sites, mode)
     fig = go.Figure()
 
@@ -528,7 +678,6 @@ def update_spectrum_chart(sites, selected_tags, cluster_mode):
         )
         return fig
 
-    multi = len(sites) > 1
     total_on = 0
     total_off = 0
 
@@ -546,8 +695,12 @@ def update_spectrum_chart(sites, selected_tags, cluster_mode):
 
         freqs_hz, amps_uv = raw_spectrums[key]
         freq_mhz = freqs_hz / 1e6
-        inferred = assignment.get(sid, '?')
-        is_on = inferred == 'ON'
+        cluster_state = assignment.get(sid, '?')
+        override_key = f"{site}::{sid}"
+        manual = overrides.get(override_key, '')
+        effective_state = manual if manual else cluster_state
+        is_override = bool(manual)
+        is_on = effective_state == 'ON'
 
         if is_on:
             total_on += 1
@@ -555,18 +708,20 @@ def update_spectrum_chart(sites, selected_tags, cluster_mode):
             total_off += 1
 
         dash_style = 'solid' if is_on else 'dash'
-        color = _site_color(site, sites) if multi else (
-            '#DC2626' if is_on else '#2563EB')
-        prefix = f"{site} | " if multi else ""
+        color = _resolve_color(site, effective_state, sites, color_by,
+                               is_override=is_override)
+        label_suffix = f" ({effective_state})" if not is_override else \
+            f" ({effective_state}*)"
 
         fig.add_trace(go.Scattergl(
             x=freq_mhz, y=amps_uv,
             mode='lines',
-            name=f"{prefix}{sid} ({inferred})",
+            name=f"{site} | {sid}{label_suffix}",
             line=dict(color=color, width=1.2, dash=dash_style),
             opacity=0.85,
             hovertemplate=(
-                f"<b>{site}</b> — {sid} ({inferred})<br>"
+                f"<b>{site}</b> — {sid} ({effective_state}"
+                f"{'  manual' if is_override else ''})<br>"
                 "Freq: %{x:.3f} MHz<br>"
                 "Amp: %{y:.2f} µV<extra></extra>"
             ),
@@ -599,120 +754,115 @@ def update_spectrum_chart(sites, selected_tags, cluster_mode):
 
 
 @callback(
-    Output('assignment-table', 'children'),
+    Output('assignment-datatable', 'data'),
     Input('site-filter', 'value'),
     Input('state-filter', 'value'),
     Input('clustering-mode', 'value'),
+    State('manual-overrides', 'data'),
 )
-def update_assignment_table(sites, state_val, cluster_mode):
+def update_assignment_table(sites, state_val, cluster_mode, overrides):
     sites = _normalize_sites(sites)
     mode = cluster_mode or CLUSTER_DEFAULT
     views = _views_for_sites(sites, mode)
-    multi = len(sites) > 1
+    overrides = overrides or {}
 
-    header_cells = []
-    if multi:
-        header_cells.append(html.Th("Site", style=_th_style()))
-    header_cells.extend([
-        html.Th("Spectrum ID", style=_th_style()),
-        html.Th("State", style=_th_style()),
-        html.Th("Score", style=_th_style()),
-        html.Th("Total Power (µV²)", style=_th_style()),
-        html.Th("Method", style=_th_style()),
-    ])
-    rows = [html.Tr(header_cells)]
-
+    table_data = []
     for site in sites:
         if site not in views:
             continue
         view = views[site]
         assignment = view['assignment']
-        conf = view.get('confidence', {})
-        sep = conf.get('separability', 0)
-        color = _site_color(site, sites)
-
-        if sep < 40:
-            warn_text = (f"{site}: Separability {sep}/100 — "
-                         "weak separation, may be a single state")
-            rows.append(html.Tr([html.Td(
-                warn_text,
-                colSpan=6 if multi else 5,
-                style={**_td_style(), 'background': '#fef3c7',
-                       'color': '#92400e', 'fontWeight': '600',
-                       'fontSize': '0.78rem', 'textAlign': 'center'},
-            )]))
-
+        sc_map = view.get('sample_confidence', {})
         mk = data['site'] == site
         filtered = data.loc[mk]
         if state_val and state_val != 'all':
-            keep = [
-                idx for idx in filtered.index
-                if assignment.get(filtered.loc[idx, 'spectrum_id'], '') == state_val
-            ]
+            keep = [idx for idx in filtered.index
+                    if assignment.get(filtered.loc[idx, 'spectrum_id'], '') == state_val]
             filtered = filtered.loc[keep]
         filtered = filtered.sort_values('spectrum_id')
 
-        sc_map = view.get('sample_confidence', {})
         for _, row in filtered.iterrows():
             sid = row['spectrum_id']
-            inferred = assignment.get(sid, '?')
-            badge_style = {
-                'display': 'inline-block', 'padding': '2px 12px',
-                'borderRadius': '12px', 'fontSize': '0.75rem',
-                'fontWeight': '700', 'letterSpacing': '0.03em',
-            }
-            if inferred == 'ON':
-                badge_style.update({'background': '#dcfce7', 'color': '#166534'})
-            else:
-                badge_style.update({'background': '#fee2e2', 'color': '#991b1b'})
-
+            cluster_state = assignment.get(sid, '?')
+            key = f"{site}::{sid}"
+            manual = overrides.get(key, '')
             sc = sc_map.get(sid, {})
-            sc_score = sc.get('score', 0)
-            if sc_score >= 70:
-                sc_bg, sc_fg = '#d1fae5', '#065f46'
-            elif sc_score >= 40:
-                sc_bg, sc_fg = '#fef9c3', '#854d0e'
-            else:
-                sc_bg, sc_fg = '#fecaca', '#991b1b'
-            sc_badge = {
-                'display': 'inline-block', 'padding': '2px 10px',
-                'borderRadius': '12px', 'fontSize': '0.72rem',
-                'fontWeight': '600',
-                'background': sc_bg, 'color': sc_fg,
-            }
+            table_data.append({
+                'site': site,
+                'spectrum_id': sid,
+                'cluster_state': cluster_state,
+                'manual_override': manual,
+                'score': sc.get('score', 0),
+                'total_power': f"{row['total_power']:,.0f}",
+                'method': view['config'],
+            })
 
-            cells = []
-            if multi:
-                cells.append(html.Td(site, style={
-                    **_td_style(), 'color': color, 'fontWeight': '600'}))
-            cells.extend([
-                html.Td(sid, style=_td_style()),
-                html.Td(html.Span(inferred, style=badge_style), style=_td_style()),
-                html.Td(html.Span(f"{sc_score}", style=sc_badge),
-                         style=_td_style()),
-                html.Td(f"{row['total_power']:,.0f}", style=_td_style()),
-                html.Td(view['config'], style={
-                    **_td_style(), 'fontSize': '0.75rem', 'color': '#78909c'}),
-            ])
-            rows.append(html.Tr(cells))
-
-    return html.Table(rows, style={
-        'width': '100%', 'borderCollapse': 'collapse', 'fontSize': '0.82rem',
-    })
+    return table_data
 
 
-def _th_style():
-    return {
-        'background': '#e8f5f7', 'color': '#005662', 'fontWeight': '600',
-        'padding': '10px 14px', 'textAlign': 'left',
-        'borderBottom': '2px solid #d4dde3', 'whiteSpace': 'nowrap',
-    }
+@callback(
+    Output('manual-overrides', 'data'),
+    Input('assignment-datatable', 'data'),
+    State('manual-overrides', 'data'),
+    prevent_initial_call=True,
+)
+def save_manual_overrides(table_data, current_overrides):
+    if not table_data:
+        return current_overrides or {}
+    overrides = dict(current_overrides or {})
+    visible_keys = set()
+    for row in table_data:
+        key = f"{row['site']}::{row['spectrum_id']}"
+        visible_keys.add(key)
+        manual = row.get('manual_override', '')
+        if manual:
+            overrides[key] = manual
+        elif key in overrides:
+            del overrides[key]
+    return overrides
 
 
-def _td_style():
-    return {
-        'padding': '8px 14px', 'borderBottom': '1px solid #e2e8f0',
-    }
+@callback(
+    Output('download-labels', 'data'),
+    Input('export-btn', 'n_clicks'),
+    State('manual-overrides', 'data'),
+    State('clustering-mode', 'value'),
+    prevent_initial_call=True,
+)
+def export_labels(n_clicks, overrides, cluster_mode):
+    if not n_clicks:
+        return no_update
+    overrides = overrides or {}
+    mode = cluster_mode or CLUSTER_DEFAULT
+
+    rows = []
+    for site in all_site_names:
+        view = _dashboard_cluster_view(site, mode)
+        if view is None:
+            continue
+        assignment = view['assignment']
+        mk = data['site'] == site
+        for _, row in data.loc[mk].iterrows():
+            sid = row['spectrum_id']
+            cluster_state = assignment.get(sid, '?')
+            key = f"{site}::{sid}"
+            manual = overrides.get(key, '')
+            final_state = manual if manual else cluster_state
+            source = 'manual' if manual else 'cluster'
+            rows.append({
+                'site': site,
+                'spectrum_id': sid,
+                'running_state': final_state,
+                'source': source,
+            })
+
+    df_export = pd.DataFrame(rows)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    return dcc.send_data_frame(
+        df_export.to_csv,
+        f'running_state_labels_{timestamp}.csv',
+        index=False,
+    )
 
 
 if __name__ == '__main__':

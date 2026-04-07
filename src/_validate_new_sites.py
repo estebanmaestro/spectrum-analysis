@@ -54,6 +54,7 @@ XLSM_SITES = OrderedDict([
 ])
 
 NEW_BATCH_DIR = os.path.join(DATA_DIR, 'new_batch')
+NEW_BATCH_2_DIR = os.path.join(DATA_DIR, 'new_batch_2')
 GAPAC_TG_RE = re.compile(r'^(TG\d+)')
 
 NEW_BATCH_SITES = OrderedDict([
@@ -74,6 +75,10 @@ NEW_BATCH_SITES = OrderedDict([
     ('OPPD_NC1', 'OPPD NC1 2025_11_14_GEN_Spectrum_Compare.xlsx'),
     ('SQN2', 'SQN2 EMI Spectrum Compare 2025_06_02.xlsm'),
     ('WBN2', 'WBN Unit 2 Generator EMI Spectrum Compare.xlsm'),
+])
+
+NEW_BATCH_2_SITES = OrderedDict([
+    ('Harq_ST3', '2025_12_30_Harq_ST3_Gen Spectrum Compare_auto.xlsx'),
 ])
 
 
@@ -332,6 +337,34 @@ def load_new_batch_site(site_name, filename, raw_store):
     return records
 
 
+def load_new_batch_2_site(site_name, filename, raw_store):
+    """Load spectrums from new_batch_2 XLSX files.
+    These use sheet 'Data' with frequencies in MHz (converted to Hz).
+    """
+    path = os.path.join(NEW_BATCH_2_DIR, filename)
+    df = pd.read_excel(path, sheet_name='Data')
+    freqs_mhz = df['MHz'].values.astype(float)
+    freqs = freqs_mhz * 1e6
+    records = []
+    for col in df.columns:
+        if col in ('Hz', 'MHz'):
+            continue
+        if df[col].isna().all():
+            continue
+        if _should_exclude_col(col):
+            continue
+        powers_uv = pd.to_numeric(df[col], errors='coerce').values
+        valid = np.isfinite(freqs) & np.isfinite(powers_uv)
+        if valid.sum() == 0:
+            continue
+        raw_store[(site_name, col)] = (freqs[valid], powers_uv[valid])
+        feats = compute_features(freqs[valid], powers_uv[valid])
+        feats.update({'spectrum_id': col, 'asset': site_name,
+                      'state': 'unknown', 'site': site_name})
+        records.append(feats)
+    return records
+
+
 # ═══════════════════════════════════════════════════════════════
 # MAIN ANALYSIS
 # ═══════════════════════════════════════════════════════════════
@@ -378,6 +411,18 @@ for site_name, filename in NEW_BATCH_SITES.items():
                           for es in effective_sites)
         print(f"  Loaded {len(site_records)} spectrums from {site_name}: {parts}")
     elif site_records:
+        print(f"  Loaded {len(site_records)} spectrums for {effective_sites[0]}")
+
+print("\n  --- new_batch_2 ---")
+for site_name, filename in NEW_BATCH_2_SITES.items():
+    fpath = os.path.join(NEW_BATCH_2_DIR, filename)
+    if not os.path.exists(fpath):
+        print(f"  SKIP (not found): {filename}")
+        continue
+    site_records = load_new_batch_2_site(site_name, filename, raw_spectrums)
+    all_records.extend(site_records)
+    effective_sites = sorted(set(r['site'] for r in site_records))
+    if site_records:
         print(f"  Loaded {len(site_records)} spectrums for {effective_sites[0]}")
 
 data = pd.DataFrame(all_records)
