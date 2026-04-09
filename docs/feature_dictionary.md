@@ -36,116 +36,116 @@ All features are derived from the **power array** `pwr = powers_uv²` (units: µ
 
 Aggregate statistics computed across the full spectrum.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 1 | `total_power` | `Σ pwr` | µV² | No | Total integrated power across all frequency bins. Primary indicator of overall emission level. |
-| 2 | `mean_power` | `mean(pwr)` | µV² | No | Average power per frequency bin. |
-| 3 | `max_power` | `max(pwr)` | µV² | No | Peak power value in any single frequency bin. |
-| 4 | `std_power` | `std(pwr)` | µV² | No | Standard deviation of power across bins. Higher values indicate a more uneven spectral distribution. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 1 | `total_power` | `Σ pwr` | µV² | No | 0.832 | 0.665 | 1.9×10⁻¹⁶ | Total integrated power across all frequency bins. Primary indicator of overall emission level. |
+| 2 | `mean_power` | `mean(pwr)` | µV² | No | 0.853 | 0.711 | 2.4×10⁻¹⁸ | Average power per frequency bin. |
+| 3 | `max_power` | `max(pwr)` | µV² | No | 0.830 | 0.695 | 3.1×10⁻¹⁶ | Peak power value in any single frequency bin. |
+| 4 | `std_power` | `std(pwr)` | µV² | No | 0.836 | 0.750 | 9.1×10⁻¹⁷ | Standard deviation of power across bins. Higher values indicate a more uneven spectral distribution. |
 
 ### 2. Band Power Statistics
 
 For each of the four frequency bands (B1–B4), four statistics are computed on the power values within that band. This produces 4 × 4 = 16 features.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 5 | `B1_power` | `Σ pwr[B1]` | µV² | No | Total power in B1 (30–300 kHz). |
-| 6 | `B1_mean` | `mean(pwr[B1])` | µV² | No | Mean power per bin in B1. |
-| 7 | `B1_max` | `max(pwr[B1])` | µV² | No | Peak power bin in B1. |
-| 8 | `B1_std` | `std(pwr[B1])` | µV² | No | Power variability within B1. |
-| 9 | `B2_power` | `Σ pwr[B2]` | µV² | No | Total power in B2 (300 kHz – 3 MHz). |
-| 10 | `B2_mean` | `mean(pwr[B2])` | µV² | No | Mean power per bin in B2. |
-| 11 | `B2_max` | `max(pwr[B2])` | µV² | No | Peak power bin in B2. |
-| 12 | `B2_std` | `std(pwr[B2])` | µV² | No | Power variability within B2. |
-| 13 | `B3_power` | `Σ pwr[B3]` | µV² | No | Total power in B3 (3–30 MHz). |
-| 14 | `B3_mean` | `mean(pwr[B3])` | µV² | No | Mean power per bin in B3. |
-| 15 | `B3_max` | `max(pwr[B3])` | µV² | No | Peak power bin in B3. |
-| 16 | `B3_std` | `std(pwr[B3])` | µV² | No | Power variability within B3. |
-| 17 | `B4_power` | `Σ pwr[B4]` | µV² | No | Total power in B4 (30–100 MHz). |
-| 18 | `B4_mean` | `mean(pwr[B4])` | µV² | No | Mean power per bin in B4. |
-| 19 | `B4_max` | `max(pwr[B4])` | µV² | No | Peak power bin in B4. |
-| 20 | `B4_std` | `std(pwr[B4])` | µV² | No | Power variability within B4. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 5 | `B1_power` | `Σ pwr[B1]` | µV² | No | 0.792 | 0.646 | 4.7×10⁻¹³ | Total power in B1 (30–300 kHz). |
+| 6 | `B1_mean` | `mean(pwr[B1])` | µV² | No | 0.807 | 0.687 | 2.6×10⁻¹⁴ | Mean power per bin in B1. |
+| 7 | `B1_max` | `max(pwr[B1])` | µV² | No | 0.781 | 0.649 | 3.2×10⁻¹² | Peak power bin in B1. |
+| 8 | `B1_std` | `std(pwr[B1])` | µV² | No | 0.790 | 0.685 | 7.2×10⁻¹³ | Power variability within B1. |
+| 9 | `B2_power` | `Σ pwr[B2]` | µV² | No | 0.888 | 0.508 | 6.5×10⁻²² | Total power in B2 (300 kHz – 3 MHz). |
+| 10 | `B2_mean` | `mean(pwr[B2])` | µV² | No | 0.905 | 0.589 | 1.2×10⁻²³ | Mean power per bin in B2. Highest ROC-AUC of all features. |
+| 11 | `B2_max` | `max(pwr[B2])` | µV² | No | 0.854 | 0.646 | 2.0×10⁻¹⁸ | Peak power bin in B2. |
+| 12 | `B2_std` | `std(pwr[B2])` | µV² | No | 0.883 | 0.636 | 2.3×10⁻²¹ | Power variability within B2. |
+| 13 | `B3_power` | `Σ pwr[B3]` | µV² | No | 0.749 | 0.223 | 6.8×10⁻¹⁰ | Total power in B3 (3–30 MHz). |
+| 14 | `B3_mean` | `mean(pwr[B3])` | µV² | No | 0.741 | 0.285 | 2.6×10⁻⁹ | Mean power per bin in B3. |
+| 15 | `B3_max` | `max(pwr[B3])` | µV² | No | 0.733 | 0.533 | 7.7×10⁻⁹ | Peak power bin in B3. |
+| 16 | `B3_std` | `std(pwr[B3])` | µV² | No | 0.735 | 0.551 | 5.9×10⁻⁹ | Power variability within B3. |
+| 17 | `B4_power` | `Σ pwr[B4]` | µV² | No | 0.591 | 0.158 | 0.024 | Total power in B4 (30–100 MHz). |
+| 18 | `B4_mean` | `mean(pwr[B4])` | µV² | No | 0.608 | 0.164 | 0.007 | Mean power per bin in B4. |
+| 19 | `B4_max` | `max(pwr[B4])` | µV² | No | 0.565 | 0.245 | 0.107 | Peak power bin in B4. Not significant. |
+| 20 | `B4_std` | `std(pwr[B4])` | µV² | No | 0.583 | 0.238 | 0.040 | Power variability within B4. |
 
 ### 3. Band Power Fractions
 
 Fraction of total power contained in each band. These are dimensionless ratios that are insensitive to absolute power level, making them comparable across sites with different baseline emissions.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 21 | `B1_frac` | `B1_power / total_power` | — | Yes | Proportion of total power in the low-frequency band (30–300 kHz). |
-| 22 | `B2_frac` | `B2_power / total_power` | — | Yes | Proportion of total power in the mid-low band (300 kHz – 3 MHz). |
-| 23 | `B3_frac` | `B3_power / total_power` | — | Yes | Proportion of total power in the mid-high band (3–30 MHz). |
-| 24 | `B4_frac` | `B4_power / total_power` | — | Yes | Proportion of total power in the high-frequency band (30–100 MHz). |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 21 | `B1_frac` | `B1_power / total_power` | — | Yes | 0.533 | 0.108 | 0.411 | Proportion of total power in the low-frequency band (30–300 kHz). Not significant. |
+| 22 | `B2_frac` | `B2_power / total_power` | — | Yes | 0.572 | 0.073 | 0.075 | Proportion of total power in the mid-low band (300 kHz – 3 MHz). Not significant. |
+| 23 | `B3_frac` | `B3_power / total_power` | — | Yes | 0.569 | 0.270 | 0.087 | Proportion of total power in the mid-high band (3–30 MHz). Not significant. |
+| 24 | `B4_frac` | `B4_power / total_power` | — | Yes | 0.701 | 0.246 | 6.2×10⁻⁷ | Proportion of total power in the high-frequency band (30–100 MHz). Only B4 fraction is significant. |
 
 ### 4. Log-Transformed Powers
 
 Logarithmic transformation compresses the dynamic range of power values and makes distributions more symmetric. Useful for methods that assume normality or for gap-based clustering.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 25 | `log_total` | `log(1 + total_power)` | log(µV²) | No | Log-compressed total power. Used by the PowerGap clustering method to detect ON/OFF separation. |
-| 26 | `B1_log` | `log(1 + B1_power)` | log(µV²) | No | Log-compressed B1 band power. |
-| 27 | `B2_log` | `log(1 + B2_power)` | log(µV²) | No | Log-compressed B2 band power. Top-ranked feature in the supervised study (consensus rank #1). |
-| 28 | `B3_log` | `log(1 + B3_power)` | log(µV²) | No | Log-compressed B3 band power. |
-| 29 | `B4_log` | `log(1 + B4_power)` | log(µV²) | No | Log-compressed B4 band power. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 25 | `log_total` | `log(1 + total_power)` | log(µV²) | No | 0.832 | 1.406 | 1.9×10⁻¹⁶ | Log-compressed total power. Used by the PowerGap clustering method. Second-highest Cohen's d of all features. |
+| 26 | `B1_log` | `log(1 + B1_power)` | log(µV²) | No | 0.792 | 1.158 | 4.7×10⁻¹³ | Log-compressed B1 band power. RFECV-selected. |
+| 27 | `B2_log` | `log(1 + B2_power)` | log(µV²) | No | 0.888 | 1.719 | 6.5×10⁻²² | Log-compressed B2 band power. Highest Cohen's d of all 72 features. Consensus importance rank #1. RFECV-selected. |
+| 28 | `B3_log` | `log(1 + B3_power)` | log(µV²) | No | 0.749 | 1.071 | 6.8×10⁻¹⁰ | Log-compressed B3 band power. |
+| 29 | `B4_log` | `log(1 + B4_power)` | log(µV²) | No | 0.591 | 0.349 | 0.024 | Log-compressed B4 band power. Weakest log-band feature. |
 
 ### 5. Band Power Ratios
 
 Ratios between bands capture the relative energy distribution. They are dimensionless and scale-invariant — if all power levels double, the ratios remain unchanged. Useful for identifying characteristic spectral shapes independent of absolute emission levels.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 30 | `B2_B1_ratio` | `B2_power / B1_power` | — | Yes | Energy ratio of mid-low to low band. Values > 1 indicate more energy in the 300 kHz – 3 MHz range than below 300 kHz. |
-| 31 | `B3_B1_ratio` | `B3_power / B1_power` | — | Yes | Energy ratio of mid-high to low band. |
-| 32 | `B4_B1_ratio` | `B4_power / B1_power` | — | Yes | Energy ratio of high to low band. |
-| 33 | `B4_B2_ratio` | `B4_power / B2_power` | — | Yes | Energy ratio of high to mid-low band. |
-| 34 | `B3_B2_ratio` | `B3_power / B2_power` | — | Yes | Energy ratio of mid-high to mid-low band. |
-| 35 | `hi_lo_ratio` | `(B3 + B4) / (B1 + B2)` | — | Yes | Ratio of upper-half to lower-half spectral energy. Summarizes the overall spectral balance in a single number. |
-| 36 | `log_B2_B1` | `log(1 + B2_B1_ratio)` | — | Yes | Log-compressed B2/B1 ratio. Reduces the effect of extreme ratio values. |
-| 37 | `log_B4_B1` | `log(1 + B4_B1_ratio)` | — | Yes | Log-compressed B4/B1 ratio. |
-| 38 | `log_hi_lo` | `log(1 + hi_lo_ratio)` | — | Yes | Log-compressed high-to-low ratio. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 30 | `B2_B1_ratio` | `B2_power / B1_power` | — | Yes | 0.580 | 0.022 | 0.046 | Energy ratio of mid-low to low band. Values > 1 indicate more energy in the 300 kHz – 3 MHz range than below 300 kHz. Borderline significant. |
+| 31 | `B3_B1_ratio` | `B3_power / B1_power` | — | Yes | 0.575 | 0.159 | 0.063 | Energy ratio of mid-high to low band. Not significant. |
+| 32 | `B4_B1_ratio` | `B4_power / B1_power` | — | Yes | 0.695 | 0.334 | 1.4×10⁻⁶ | Energy ratio of high to low band. |
+| 33 | `B4_B2_ratio` | `B4_power / B2_power` | — | Yes | 0.752 | 0.167 | 4.4×10⁻¹⁰ | Energy ratio of high to mid-low band. Highest AUC among original ratio features. |
+| 34 | `B3_B2_ratio` | `B3_power / B2_power` | — | Yes | 0.648 | 0.315 | 2.4×10⁻⁴ | Energy ratio of mid-high to mid-low band. |
+| 35 | `hi_lo_ratio` | `(B3 + B4) / (B1 + B2)` | — | Yes | 0.662 | 0.319 | 6.3×10⁻⁵ | Ratio of upper-half to lower-half spectral energy. Summarizes overall spectral balance. |
+| 36 | `log_B2_B1` | `log(1 + B2_B1_ratio)` | — | Yes | 0.580 | 0.101 | 0.046 | Log-compressed B2/B1 ratio. Borderline significant. |
+| 37 | `log_B4_B1` | `log(1 + B4_B1_ratio)` | — | Yes | 0.695 | 0.122 | 1.4×10⁻⁶ | Log-compressed B4/B1 ratio. |
+| 38 | `log_hi_lo` | `log(1 + hi_lo_ratio)` | — | Yes | 0.662 | 0.127 | 6.3×10⁻⁵ | Log-compressed high-to-low ratio. |
 
 ### 6. Spectral Shape Descriptors
 
 Statistical moments and information-theoretic measures of the power distribution treated as a probability distribution (`normp = pwr / total_power`). These describe the shape of the spectrum independent of its magnitude.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 39 | `spectral_centroid` | `Σ(i × normp[i])` | bin index | Yes | Weighted-mean frequency index — the "center of mass" of the spectrum. Lower values mean energy is concentrated at lower frequencies. |
-| 40 | `spectral_spread` | `√(Σ((i − centroid)² × normp))` | bin index | Yes | Standard deviation of the spectral distribution around the centroid. Larger values indicate energy spread across a wider frequency range. |
-| 41 | `spectral_skew` | `scipy.stats.skew(pwr)` | — | Yes | Asymmetry of the power distribution. Positive skew means a long tail toward high-power bins (a few bins dominate). |
-| 42 | `spectral_kurtosis` | `scipy.stats.kurtosis(pwr)` | — | Yes | Peakedness of the power distribution. High kurtosis means energy is concentrated in a few sharp peaks rather than spread evenly. |
-| 43 | `spectral_entropy` | `H(normp) / log(N)` | — | Yes | Normalized Shannon entropy (0 to 1). A value near 1.0 means power is uniformly distributed across frequencies (flat spectrum). A value near 0 means power is concentrated in very few bins (peaked spectrum). |
-| 44 | `spectral_flatness` | `exp(mean(log(pwr))) / mean(pwr)` | — | Yes | Wiener entropy — ratio of geometric mean to arithmetic mean of power. Values near 1.0 indicate a flat/white-noise-like spectrum. Values near 0 indicate a spectrum with prominent peaks. Also known as tonality coefficient. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 39 | `spectral_centroid` | `Σ(i × normp[i])` | bin index | Yes | 0.629 | 0.284 | 0.001 | Weighted-mean frequency index — the "center of mass" of the spectrum. Lower values mean energy is concentrated at lower frequencies. |
+| 40 | `spectral_spread` | `√(Σ((i − centroid)² × normp))` | bin index | Yes | 0.673 | 0.710 | 1.9×10⁻⁵ | Standard deviation of the spectral distribution around the centroid. Larger values indicate energy spread across a wider frequency range. |
+| 41 | `spectral_skew` | `scipy.stats.skew(pwr)` | — | Yes | 0.653 | 0.160 | 1.5×10⁻⁴ | Asymmetry of the power distribution. Positive skew means a long tail toward high-power bins. |
+| 42 | `spectral_kurtosis` | `scipy.stats.kurtosis(pwr)` | — | Yes | 0.657 | 0.026 | 9.6×10⁻⁵ | Peakedness of the power distribution. High kurtosis = energy in a few sharp peaks. Low Cohen's d despite good AUC — high rank discrimination but small absolute gap. |
+| 43 | `spectral_entropy` | `H(normp) / log(N)` | — | Yes | 0.584 | 0.313 | 0.038 | Normalized Shannon entropy (0–1). Near 1.0 = flat spectrum, near 0 = peaked spectrum. |
+| 44 | `spectral_flatness` | `exp(mean(log(pwr))) / mean(pwr)` | — | Yes | 0.641 | 0.458 | 4.9×10⁻⁴ | Wiener entropy — geometric/arithmetic mean ratio. Near 1.0 = flat/white-noise-like. Near 0 = prominent peaks. Also known as tonality coefficient. |
 
 ### 7. Peak and Slope Characteristics
 
 Features that describe the dominant frequency, spectral tilt, and energy roll-off.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 45 | `peak_freq_mhz` | `freqs[argmax(pwr)] / 10⁶` | MHz | Yes | Frequency (in MHz) of the bin with the highest power. Identifies the dominant emission frequency. |
-| 46 | `peak_to_mean` | `max(pwr) / mean(pwr)` | — | Yes | Ratio of the peak power to the mean power. High values indicate a single dominant narrowband emission; low values indicate broadband energy. |
-| 47 | `spectral_slope` | `polyfit(i, log(1+pwr), 1)[0]` | log(µV²)/bin | Yes | Slope of a linear fit to the log-power vs. frequency-bin-index. Captures the rate at which power decays across the spectrum. More negative values = steeper roll-off from low to high frequencies. Running equipment typically changes this tilt. Consensus importance rank #2 in the supervised study. |
-| 48 | `rolloff_freq_mhz` | `freq where cumsum(pwr) ≥ 0.85 × total` | MHz | Yes | The frequency (in MHz) below which 85% of the total spectral energy is contained. A low rolloff frequency means most energy is concentrated at low frequencies; a higher value indicates significant high-frequency content. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 45 | `peak_freq_mhz` | `freqs[argmax(pwr)] / 10⁶` | MHz | Yes | 0.559 | 0.152 | 0.144 | Frequency (in MHz) of the bin with the highest power. Not significant. |
+| 46 | `peak_to_mean` | `max(pwr) / mean(pwr)` | — | Yes | 0.670 | 0.159 | 2.4×10⁻⁵ | Ratio of peak power to mean power. High values = single dominant narrowband emission; low values = broadband energy. |
+| 47 | `spectral_slope` | `polyfit(i, log(1+pwr), 1)[0]` | log(µV²)/bin | Yes | 0.787 | 0.842 | 1.2×10⁻¹² | Slope of linear fit to log-power vs frequency-bin-index. More negative = steeper roll-off. Best scale-invariant original feature. Consensus importance rank #2. |
+| 48 | `rolloff_freq_mhz` | `freq where cumsum(pwr) ≥ 0.85 × total` | MHz | Yes | 0.509 | 0.179 | 0.834 | Frequency below which 85% of total energy lies. Not significant. |
 
 ### 8. Amplitude Shape
 
 Features computed on the raw amplitude (µV) rather than power (µV²), characterizing the waveform's peakiness and variability.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 49 | `crest_factor` | `max(amplitude) / RMS(amplitude)` | — | Yes | Ratio of peak amplitude to RMS amplitude. High crest factor indicates sharp transient peaks in the spectrum. Low values indicate a more uniform amplitude envelope. |
-| 50 | `amplitude_cv` | `std(amplitude) / mean(amplitude)` | — | Yes | Coefficient of variation of the amplitude. Dimensionless measure of relative variability. Higher values mean the spectrum has more contrast between peaks and valleys. Selected by RFECV as one of the 5 optimal features. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 49 | `crest_factor` | `max(amplitude) / RMS(amplitude)` | — | Yes | 0.670 | 0.310 | 2.4×10⁻⁵ | Ratio of peak amplitude to RMS amplitude. High = sharp transient peaks; low = uniform envelope. |
+| 50 | `amplitude_cv` | `std(amplitude) / mean(amplitude)` | — | Yes | 0.503 | 0.165 | 0.952 | Coefficient of variation of amplitude. Not significant univariately, but RFECV-selected — contributes in multivariate combination with other features. |
 
 ### 9. Cross-Band Dynamics
 
 Features that capture trends across the four frequency bands, summarizing how energy changes from B1 through B4.
 
-| # | Feature | Formula | Units | Scale-Inv | Description |
-|---|---------|---------|-------|-----------|-------------|
-| 51 | `band_gradient` | `mean(diff(log(1 + Bx_power)))` | — | Yes | Average successive difference in log-band-power across B1 → B2 → B3 → B4. Positive values mean energy increases toward higher bands; negative values mean it decreases. Captures the overall direction of the spectral envelope. |
-| 52 | `band_range` | `max(log(1+Bx)) − min(log(1+Bx))` | — | Yes | Dynamic range of log-band-powers across the four bands. Large values indicate strong contrast between the most and least energetic bands; small values indicate uniform energy distribution. |
+| # | Feature | Formula | Units | SI | AUC | d | MW p | Description |
+|---|---------|---------|-------|----|-----|---|------|-------------|
+| 51 | `band_gradient` | `mean(diff(log(1 + Bx_power)))` | — | Yes | 0.695 | 0.631 | 1.4×10⁻⁶ | Average successive difference in log-band-power across B1 → B2 → B3 → B4. Positive = energy increases toward higher bands; negative = decreases. |
+| 52 | `band_range` | `max(log(1+Bx)) − min(log(1+Bx))` | — | Yes | 0.634 | 0.493 | 9.4×10⁻⁴ | Dynamic range of log-band-powers across the four bands. Large = strong contrast between strongest and weakest bands. |
 
 ---
 
