@@ -17,7 +17,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import (Dash, html, dcc, dash_table, callback,
                   Output, Input, State, no_update)
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import (silhouette_score, accuracy_score, f1_score,
+                             precision_score, recall_score, confusion_matrix)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUNDLE_PATH = os.path.join(ROOT, '_results_bundle.pkl')
@@ -521,6 +522,7 @@ def _tab2_layout():
         ]),
         html.Div(id='sc-info-cards', style={
             'display': 'flex', 'gap': '16px', 'marginBottom': '24px', 'flexWrap': 'wrap'}),
+        html.Div(id='sc-metrics-panel', style={'marginBottom': '24px'}),
         html.Div(style=_CARD_STYLE, children=[
             dcc.Graph(id='sc-spectrum-chart', style={'height': '560px'})]),
         html.Div(style=_CARD_STYLE, children=[
@@ -888,6 +890,101 @@ def sc_update_info_cards(sites, color_mode):
         _make_card(f"ON ({label_kind})", str(n_on), '#DC2626'),
         _make_card(f"OFF ({label_kind})", str(n_off), '#2563EB'),
     ]
+
+
+# Cross-validated metrics from the notebook (5-fold site-aware StratifiedGroupKFold)
+_CV_METRICS = {
+    'accuracy': 0.831, 'f1': 0.886, 'precision': 0.832,
+    'recall': 0.947, 'auc': 0.819, 'fn': 10, 'fp': 36,
+}
+
+
+def _metric_cell(label, value, highlight=False):
+    """Single metric cell for the metrics table."""
+    return html.Td(children=[
+        html.Div(label, style={'fontSize': '0.7rem', 'color': '#78909c',
+                                'fontWeight': '600', 'textTransform': 'uppercase',
+                                'letterSpacing': '0.03em'}),
+        html.Div(value, style={'fontSize': '1.05rem', 'fontWeight': '700',
+                                'color': '#005662' if highlight else '#1a2332',
+                                'marginTop': '2px'}),
+    ], style={'padding': '10px 18px', 'textAlign': 'center',
+              'borderRight': '1px solid #e2e8f0'})
+
+
+def _build_metrics_row(title, acc, f1, prec, rec, auc, fn, fp, note=''):
+    """One row in the metrics summary."""
+    tag_style = {'fontSize': '0.68rem', 'color': '#64748b', 'fontStyle': 'italic',
+                 'marginTop': '2px'}
+    return html.Tr(children=[
+        html.Td(children=[
+            html.Div(title, style={'fontWeight': '700', 'fontSize': '0.82rem',
+                                    'color': '#1a2332'}),
+            html.Div(note, style=tag_style) if note else None,
+        ], style={'padding': '10px 14px', 'borderRight': '2px solid #005662',
+                  'minWidth': '180px'}),
+        _metric_cell("Accuracy", f"{acc:.3f}"),
+        _metric_cell("F1", f"{f1:.3f}", highlight=True),
+        _metric_cell("Precision", f"{prec:.3f}"),
+        _metric_cell("Recall", f"{rec:.3f}"),
+        _metric_cell("AUC", f"{auc:.3f}" if auc is not None else "—"),
+        _metric_cell("FN", str(fn)),
+        _metric_cell("FP", str(fp)),
+    ])
+
+
+@callback(Output('sc-metrics-panel', 'children'),
+          Input('sc-site-filter', 'value'))
+def sc_update_metrics(sites):
+    sites = _sc_normalize_sites(sites)
+    rows = []
+
+    # Row 1: Cross-validated (global, from the notebook)
+    m = _CV_METRICS
+    rows.append(_build_metrics_row(
+        "5-Feature System", m['accuracy'], m['f1'], m['precision'],
+        m['recall'], m['auc'], m['fn'], m['fp'],
+        note="5-fold site-aware CV (all data)"))
+
+    # Row 2: In-sample on filtered sites
+    df = dc_data[dc_data['site'].isin(sites)].copy()
+    has_labels = df['running_state'].isin(['ON', 'OFF'])
+    has_pred = df['prediction'].isin(['ON', 'OFF'])
+    df_eval = df[has_labels & has_pred]
+    if len(df_eval) >= 2:
+        y_true = (df_eval['running_state'] == 'ON').values
+        y_pred = (df_eval['prediction'] == 'ON').values
+        if y_true.sum() > 0 and (~y_true).sum() > 0:
+            acc = accuracy_score(y_true, y_pred)
+            f1 = f1_score(y_true, y_pred, zero_division=0)
+            prec = precision_score(y_true, y_pred, zero_division=0)
+            rec = recall_score(y_true, y_pred, zero_division=0)
+            cm = confusion_matrix(y_true, y_pred)
+            fn = int(cm[1, 0])
+            fp = int(cm[0, 1])
+            site_lbl = ', '.join(sites) if len(sites) <= 3 else f"{len(sites)} sites"
+            rows.append(_build_metrics_row(
+                "In-sample (selected)", acc, f1, prec, rec, None, fn, fp,
+                note=f"{len(df_eval)} spectrums — {site_lbl}"))
+
+    table = html.Table(
+        children=[html.Tbody(rows)],
+        style={'width': '100%', 'borderCollapse': 'collapse',
+               'background': 'white', 'borderRadius': '8px',
+               'overflow': 'hidden',
+               'boxShadow': '0 1px 8px rgba(0,0,0,0.06)',
+               'border': '1px solid #e2e8f0'})
+
+    return html.Div(children=[
+        html.H3("Scoring Metrics — 5-Feature Rule-Based System", style={
+            'margin': '0 0 10px', 'fontSize': '0.95rem', 'color': '#1a2332'}),
+        html.Div("Cross-validated: thresholds fitted on training folds only "
+                 "(StratifiedGroupKFold, 5 folds, grouped by site). "
+                 "In-sample: global medians applied to selected sites.",
+                 style={'fontSize': '0.76rem', 'color': '#64748b',
+                        'marginBottom': '12px', 'lineHeight': '1.4'}),
+        table,
+    ], style={**_CARD_STYLE, 'padding': '20px 24px'})
 
 
 @callback(
